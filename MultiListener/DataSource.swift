@@ -116,7 +116,7 @@ extension DocumentSnapshot: Identifiable {
 
     public typealias ID = String
 
-    public var id: String { self.reference.path }
+    public var id: String { self.reference.documentID }
 }
 
 extension DataSource: ObservableObject {

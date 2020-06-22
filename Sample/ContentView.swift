@@ -9,6 +9,20 @@
 import SwiftUI
 import Combine
 import FirebaseFirestore
+import FirebaseFirestoreSwift
+
+
+struct Model: Codable, Identifiable {
+
+    var id: String { self.documentID ?? "" }
+
+    typealias ID = String
+
+    @DocumentID var documentID: String?
+
+    @ServerTimestamp var createTime: Timestamp!
+
+}
 
 struct ContentView: View {
 
@@ -22,6 +36,7 @@ struct ContentView: View {
     ])) var group: DataSourceGroup
 
     func next(id: String) {
+        print(" next", id)
         self.group.sources.forEach { source in
             if let querySnapshot = source.querySnapshot {
                 if let lastDocumentSnapshot = source.documents.sorted(by: sort).last,
@@ -38,17 +53,21 @@ struct ContentView: View {
         return t0.dateValue() < t1.dateValue()
     }
 
+    var dataSource: [Model] {
+        return self.group
+            .sorted(by: sort)
+            .map { snapshot in try! Firestore.Decoder().decode(Model.self, from: snapshot.data(with: .estimate)!, in: snapshot.reference) }
+    }
+
     var body: some View {
         NavigationView {
-            List(group
-                .sorted(by: sort)
-            ) { snapshot in
+            List(dataSource) { snapshot in
                 HStack {
                     VStack(alignment: .leading) {
-                        Text(snapshot.reference.path).onAppear {
+                        Text(snapshot.id).onAppear {
                             self.next(id: snapshot.id)
                         }
-                        Text("\((snapshot.data(with: .estimate)?["createTime"] as! Timestamp).dateValue())").font(.system(size: 10))
+                        Text("\(snapshot.createTime)").font(.system(size: 10))
                     }
 
                     if self.isLast(id: snapshot.id) {
@@ -72,6 +91,7 @@ struct ContentView: View {
     }
 
     func isLast(id: String) -> Bool {
+        print("isLast", id, self.group.sources.compactMap { $0.documents.sorted(by: sort).last?.id }, self.group.sources.compactMap { $0.documents.sorted(by: sort).last?.id }.contains(id))
         return self.group.sources.compactMap { $0.documents.sorted(by: sort).last?.id }.contains(id)
     }
 }
