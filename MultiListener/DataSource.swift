@@ -84,12 +84,9 @@ public final class DataSourceGroup {
         let publishers = Publishers.MergeMany(sources.compactMap { $0.$documents })
         self._cancellable = publishers
             .collect(sources.count)
-            .map { $0.reduce([]) { $0 + $1 } }
-            .sink(receiveValue: { data in
-                let unique = data.reduce([]) { $0.map{ $0.id }.contains($1.id) ? $0 : $0 + [$1] }
-                let documents = unique.filter { !self.documents.map { $0.id }.contains($0.id) }
-                self.documents += documents
-            })
+            .map { $0.combine.unique }
+            .map { $0.filter { !self.documents.map { $0.id }.contains($0.id) } }
+            .sink { documents in self.documents += documents }
         sources.forEach { $0.get(source: source) }
     }
 
@@ -97,12 +94,9 @@ public final class DataSourceGroup {
         let publishers = Publishers.MergeMany(sources.map { $0.$documents })
         self._cancellable = publishers
             .collect(sources.count)
-            .map { $0.reduce([]) { $0 + $1 } }
-            .sink(receiveValue: { data in
-                let unique = data.reduce([]) { $0.map{ $0.id }.contains($1.id) ? $0 : $0 + [$1] }
-                let documents = unique.filter { !self.documents.map { $0.id }.contains($0.id) }
-                self.documents += documents
-            })
+            .map { $0.combine.unique }
+            .map { $0.filter { !self.documents.map { $0.id }.contains($0.id) } }
+            .sink { documents in self.documents += documents }
         self._listeners = sources.map { $0.listen(includeMetadataChanges: includeMetadataChanges) }
     }
 
@@ -110,6 +104,20 @@ public final class DataSourceGroup {
         self._listeners.forEach { $0.remove() }
     }
 
+}
+
+extension Array where Element == [DocumentSnapshot] {
+
+    var combine: [DocumentSnapshot] {
+        self.reduce([], +)
+    }
+}
+
+extension Array where Element == DocumentSnapshot {
+
+    var unique: Self {
+        self.reduce([]) { $0.map{ $0.id }.contains($1.id) ? $0 : $0 + [$1] }
+    }
 }
 
 extension DocumentSnapshot: Identifiable {
